@@ -7,12 +7,33 @@ performance with a mandatory in-sample/out-of-sample split.
 
 Phase 1 of three:
 
-1. **Backtesting engine** (this) — test strategies on the past.
-2. **Paper trading** — run the same strategy code on live prices with fake
-   money via Alpaca's paper API.
+1. **Backtesting engine** — test strategies on the past. ✅
+2. **Paper trading** — the same strategy classes run on live prices with fake
+   money via Alpaca's paper API. ✅
 3. **AI assistant** — describe a strategy in plain English; an LLM compiles
    it to a validated config, the engine backtests it and reports. The AI
    suggests; it never trades.
+
+## Paper trading (Phase 2)
+
+```bash
+trade live sma_cross --symbols SPY            # dry-run: prints the trade plan
+trade live sma_cross --symbols SPY --execute  # submits to the PAPER account
+trade account                                 # paper equity and positions
+```
+
+How it works: the runner replays recent history through the exact same
+strategy class and engine used for backtesting to reconstruct the portfolio
+the strategy wants *today*, diffs that against the paper account's actual
+positions, and submits only the difference (rebalances under 0.5% of equity
+are skipped). Run it once per day after the close — orders queue for the next
+open, the same fill timing the backtester assumes.
+
+Safety: `paper=True` is hard-coded — no code path in this project can reach a
+live-money endpoint — and without `--execute` nothing is ever submitted.
+Credentials: free account at [alpaca.markets](https://alpaca.markets), paper
+API keys from the dashboard, then
+`export ALPACA_API_KEY=... ALPACA_SECRET_KEY=...`.
 
 ## Design rules
 

@@ -3,6 +3,9 @@
 Examples:
     trade backtest sma_cross --symbols SPY --from 2010-01-01 --split 2021-01-01
     trade backtest momentum --symbols XLK,XLF,XLE,XLV,XLI,XLP,XLY,XLU,XLB
+    trade live sma_cross --symbols SPY            # dry-run: prints the plan
+    trade live sma_cross --symbols SPY --execute  # submits to the PAPER account
+    trade account                                 # paper account status
 """
 
 from __future__ import annotations
@@ -50,16 +53,36 @@ def main(argv: list[str] | None = None) -> int:
                     help="strategy parameter override, repeatable")
     bt.add_argument("--report-dir", default="reports")
 
+    live = sub.add_parser("live", help="run a strategy against the Alpaca PAPER account")
+    live.add_argument("strategy", choices=sorted(STRATEGIES))
+    live.add_argument("--symbols", default="SPY", help="comma-separated tickers")
+    live.add_argument("--lookback-days", type=int, default=400,
+                      help="history replayed to reconstruct the strategy's state")
+    live.add_argument("--param", action="append", default=[], metavar="KEY=VALUE")
+    live.add_argument("--execute", action="store_true",
+                      help="actually submit orders (default is a dry-run print)")
+
+    sub.add_parser("account", help="show paper account equity and positions")
+
     args = parser.parse_args(argv)
-    return _backtest(args)
+    if args.command == "backtest":
+        return _backtest(args)
+    if args.command == "live":
+        return _live(args)
+    return _account()
+
+
+def _parse_overrides(items: list[str]) -> dict:
+    overrides = {}
+    for item in items:
+        key, _, value = item.partition("=")
+        overrides[key] = float(value) if "." in value else int(value)
+    return overrides
 
 
 def _backtest(args: argparse.Namespace) -> int:
     symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
-    overrides = {}
-    for item in args.param:
-        key, _, value = item.partition("=")
-        overrides[key] = float(value) if "." in value else int(value)
+    overrides = _parse_overrides(args.param)
 
     strategy = STRATEGIES[args.strategy](**overrides)
     frames = load_bars(symbols, args.start, args.end)
@@ -86,6 +109,63 @@ def _backtest(args: argparse.Namespace) -> int:
         split=args.split,
     )
     print(f"equity chart: {chart}")
+    return 0
+
+
+def _live(args: argparse.Namespace) -> int:
+    from .live.alpaca_broker import AlpacaPaperBroker, MissingCredentials
+    from .live.runner import compute_desired_weights, live_data_window, reconcile
+
+    symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
+    strategy = STRATEGIES[args.strategy](**_parse_overrides(args.param))
+
+    frames = live_data_window(symbols, lookback_days=args.lookback_days)
+    desired = compute_desired_weights(strategy, frames)
+    print(f"desired portfolio ({args.strategy}):")
+    for symbol, weight in sorted(desired.items()):
+        print(f"  {symbol:6} {weight:6.1%}")
+
+    try:
+        broker = AlpacaPaperBroker()
+    except MissingCredentials as e:
+        print(f"\n{e}")
+        return 1
+
+    equity = broker.equity()
+    positions = broker.position_values()
+    orders = reconcile(desired, equity, positions)
+
+    print(f"\npaper account equity: ${equity:,.2f}")
+    print(f"current positions: {positions or 'none'}")
+    if not orders:
+        print("already aligned with the strategy — nothing to do.")
+        return 0
+
+    print("\nplanned orders:")
+    for order in orders:
+        print(f"  {order.describe()}")
+
+    if not args.execute:
+        print("\ndry-run only. Re-run with --execute to submit to the PAPER account.")
+        return 0
+
+    print("\nsubmitting to PAPER account:")
+    for order in orders:
+        print(f"  {broker.submit(order)}")
+    return 0
+
+
+def _account() -> int:
+    from .live.alpaca_broker import AlpacaPaperBroker, MissingCredentials
+
+    try:
+        broker = AlpacaPaperBroker()
+    except MissingCredentials as e:
+        print(str(e))
+        return 1
+    print(f"paper equity: ${broker.equity():,.2f}")
+    for symbol, value in sorted(broker.position_values().items()):
+        print(f"  {symbol:6} ${value:,.2f}")
     return 0
 
 
