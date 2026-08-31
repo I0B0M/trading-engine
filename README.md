@@ -54,12 +54,39 @@ built to surface it rather than hide it.
 
 Two known reasons it is weak, both real limitations rather than excuses: the
 universe is 9 sector ETFs, so there is almost no cross-sectional breadth to
-rank; and the composite is price-only, missing quality (gross profits/assets)
-and value (book-to-market) — the two best-documented factors for large caps —
-because they need point-in-time fundamentals. The SEC's XBRL API
-(`data.sec.gov/api/xbrl/companyconcept/...`) provides those free back to ~2009,
-with a `filed` date on every fact, which is the route to adding them without
-look-ahead bias.
+rank; and the composite is price-only, missing quality and value — the two
+best-documented factors for large caps.
+
+## Point-in-time fundamentals
+
+`data/fundamentals.py` reads the SEC's XBRL `companyfacts` API, which stamps
+every reported number with the date it was **filed**. Filtering on
+`filed <= as_of` reproduces exactly what was public that day:
+
+```
+AAPL Assets, same query, three different dates:
+  as of 2019-06-01: FY ending 2018-09-29 = 365,725,000,000 (filed 2018-11-05)
+  as of 2019-10-31: FY ending 2019-09-28 = 338,516,000,000 (filed 2019-10-31)
+  as of 2024-06-30: FY ending 2023-09-30 = 352,583,000,000 (filed 2023-11-03)
+```
+
+This matters because using today's *restated* figures is look-ahead bias:
+sampling shows net income is revised in ~10% of firm-years, by a median 14%
+when it changes — and net income is the numerator of ROE.
+
+**Coverage is 70%, measured not assumed.** Across 20 large caps, gross
+profits / assets computed for 14. The failures are structural: banks (JPM,
+BAC) report no cost-of-goods line — and since Novy-Marx (2013) excludes
+financials outright, returning nothing there is *correct*. Utilities,
+franchises and energy filers (NEE, MCD, XOM) don't use the standard COGS
+element either. A quality factor therefore cannot rank a universe uniformly,
+and letting those names silently drop out of every ranking is itself a
+selection bias worth naming.
+
+Two quirks worth knowing if you use this: the SEC returns **403 for any
+User-Agent containing "github.com"**, and the `companyconcept` endpoint
+returns empty data for some tags that `companyfacts` has in full (Coca-Cola's
+`Assets` came back empty from one and 144 facts from the other).
 
 ## Paper trading (Phase 2)
 
