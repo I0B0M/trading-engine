@@ -18,6 +18,11 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
 
+def env_file_path() -> Path:
+    """Absolute path of the project's .env, whether or not it exists yet."""
+    return _repo_root() / ".env"
+
+
 def load_env_file(path: Path | None = None) -> None:
     """Read KEY=VALUE lines from `.env` into os.environ (once per process)."""
     global _loaded

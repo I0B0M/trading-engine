@@ -63,12 +63,15 @@ def main(argv: list[str] | None = None) -> int:
                       help="actually submit orders (default is a dry-run print)")
 
     sub.add_parser("account", help="show paper account equity and positions")
+    sub.add_parser("keys", help="save Alpaca paper keys to .env interactively")
 
     args = parser.parse_args(argv)
     if args.command == "backtest":
         return _backtest(args)
     if args.command == "live":
         return _live(args)
+    if args.command == "keys":
+        return _keys()
     return _account()
 
 
@@ -152,6 +155,50 @@ def _live(args: argparse.Namespace) -> int:
     print("\nsubmitting to PAPER account:")
     for order in orders:
         print(f"  {broker.submit(order)}")
+    return 0
+
+
+def _keys() -> int:
+    """Prompt for Alpaca paper keys and write them to .env (mode 0600).
+
+    Typed here rather than passed as arguments so the secret never lands in
+    shell history; the secret prompt does not echo.
+    """
+    import getpass
+
+    from .live.env import env_file_path
+
+    target = env_file_path()
+    print("Alpaca PAPER keys (https://alpaca.markets -> Paper Trading -> API Keys)")
+    print(f"Saving to: {target}\n")
+
+    try:
+        key = input("API key ID       : ").strip()
+        secret = getpass.getpass("Secret key (hidden): ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print("\nCancelled; nothing was written.")
+        return 1
+    if not key or not secret:
+        print("\nBoth values are required; nothing was written.")
+        return 1
+
+    other = {}
+    if target.is_file():
+        for raw in target.read_text().splitlines():
+            line = raw.strip()
+            if line and not line.startswith("#") and "=" in line:
+                name, _, value = line.partition("=")
+                name = name.strip()
+                if name not in ("ALPACA_API_KEY", "ALPACA_SECRET_KEY"):
+                    other[name] = value.strip()
+
+    lines = [f"ALPACA_API_KEY={key}", f"ALPACA_SECRET_KEY={secret}"]
+    lines += [f"{n}={v}" for n, v in other.items()]
+    target.write_text("\n".join(lines) + "\n")
+    target.chmod(0o600)
+
+    print(f"\nSaved {len(lines)} entries to {target.name} (readable only by you).")
+    print("Verify with:  trade account")
     return 0
 
 

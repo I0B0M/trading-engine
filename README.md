@@ -38,8 +38,13 @@ Free account at [alpaca.markets](https://alpaca.markets), generate **paper**
 API keys from the dashboard, then:
 
 ```bash
-cp .env.example .env   # then edit .env and paste the two values
+trade keys
 ```
+
+It prompts for the key and secret (the secret is not echoed) and writes them
+to `.env` with mode 0600, so nothing lands in shell history. Editing `.env` by
+hand works too — note it is a dotfile, so Finder hides it unless you press
+Cmd+Shift+period.
 
 `.env` is gitignored, so keys stay off the command line, out of shell history,
 and out of git. Shell exports still work and take precedence if you prefer
