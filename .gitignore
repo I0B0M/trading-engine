@@ -6,3 +6,5 @@ data_cache/
 __pycache__/
 *.pyc
 reports/
+.DS_Store
+**/.DS_Store
