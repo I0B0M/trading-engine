@@ -10,9 +10,52 @@ Phase 1 of three:
 1. **Backtesting engine** — test strategies on the past. ✅
 2. **Paper trading** — the same strategy classes run on live prices with fake
    money via Alpaca's paper API. ✅
+2b. **Honest validation** — every backtest is logged and its Sharpe is judged
+   against the number of configurations ever tried. ✅
 3. **AI assistant** — describe a strategy in plain English; an LLM compiles
    it to a validated config, the engine backtests it and reports. The AI
    suggests; it never trades.
+
+## Honest validation
+
+Every `trade backtest` run appends its configuration to `trials.jsonl` and then
+judges the Sharpe ratio against how many configurations have *ever* been tried
+— including the failures. This is automatic and cannot be opted out of, because
+a trial count assembled after the fact is exactly the biased number the
+correction exists to remove.
+
+```bash
+trade trials     # every configuration ever tried
+```
+
+Why it matters, from the source papers: testing only **10** variants of a
+worthless strategy is expected to produce an in-sample Sharpe of **1.57**
+(Bailey & López de Prado). With 5 years of data, testing more than ~45
+configurations all but guarantees a Sharpe of 1.0 whose true value is zero.
+Both figures are reproduced exactly by `tests/test_validation.py`.
+
+### What this found about our own strategies
+
+Measured, not assumed — sector ETFs, 2006–2026:
+
+| Strategy | CAGR | Sharpe | max drawdown |
+|---|---|---|---|
+| SPY buy-and-hold | **11.1%** | 0.65 | −55.2% |
+| multifactor (best of 9 configs) | 9.9% | 0.67 | −49.9% |
+
+After 11 logged configurations the luck hurdle is a Sharpe of **1.62**. Our best
+is **0.67**, so the verdict is *not distinguishable from luck* — and it earned
+less money than buying the index. That is the honest result, and the engine is
+built to surface it rather than hide it.
+
+Two known reasons it is weak, both real limitations rather than excuses: the
+universe is 9 sector ETFs, so there is almost no cross-sectional breadth to
+rank; and the composite is price-only, missing quality (gross profits/assets)
+and value (book-to-market) — the two best-documented factors for large caps —
+because they need point-in-time fundamentals. The SEC's XBRL API
+(`data.sec.gov/api/xbrl/companyconcept/...`) provides those free back to ~2009,
+with a `filed` date on every fact, which is the route to adding them without
+look-ahead bias.
 
 ## Paper trading (Phase 2)
 

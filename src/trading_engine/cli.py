@@ -19,6 +19,7 @@ from .engine.backtest import run_backtest
 from .metrics.report import format_report, save_equity_chart, split_metrics
 from .strategies.buy_and_hold import BuyAndHold
 from .strategies.momentum import SectorMomentum
+from .strategies.multifactor import MultiFactor
 from .strategies.rsi_reversion import RsiReversion
 from .strategies.sma_cross import SmaCross
 
@@ -27,6 +28,7 @@ STRATEGIES = {
     "sma_cross": SmaCross,
     "momentum": SectorMomentum,
     "rsi_reversion": RsiReversion,
+    "multifactor": MultiFactor,
 }
 
 SECTOR_ETFS = "XLK,XLF,XLE,XLV,XLI,XLP,XLY,XLU,XLB"
@@ -64,6 +66,7 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("account", help="show paper account equity and positions")
     sub.add_parser("keys", help="save Alpaca paper keys to .env interactively")
+    sub.add_parser("trials", help="show every backtest configuration ever tried")
 
     args = parser.parse_args(argv)
     if args.command == "backtest":
@@ -72,14 +75,23 @@ def main(argv: list[str] | None = None) -> int:
         return _live(args)
     if args.command == "keys":
         return _keys()
+    if args.command == "trials":
+        from .validation.trials import summary
+
+        print(summary())
+        return 0
     return _account()
 
 
 def _parse_overrides(items: list[str]) -> dict:
+    """KEY=VALUE pairs; numbers become numbers, anything else stays a string."""
     overrides = {}
     for item in items:
         key, _, value = item.partition("=")
-        overrides[key] = float(value) if "." in value else int(value)
+        try:
+            overrides[key.strip()] = float(value) if "." in value else int(value)
+        except ValueError:
+            overrides[key.strip()] = value.strip()
     return overrides
 
 
@@ -102,6 +114,29 @@ def _backtest(args: argparse.Namespace) -> int:
     bench_metrics = split_metrics(bench_equity, args.split, f"hold {benchmark}")
 
     print(format_report(strat_metrics, bench_metrics, n_fills=len(result.fills)))
+
+    # Log the trial and judge the Sharpe against every configuration ever tried.
+    # This happens automatically and unconditionally: a trial count assembled
+    # after the fact is exactly the biased number the correction exists to fix.
+    from .validation.deflated import assess
+    from .validation.trials import Trial, record
+
+    full = strat_metrics[0]
+    n_trials = record(
+        Trial(
+            strategy=args.strategy,
+            symbols=",".join(symbols),
+            params=",".join(f"{k}={v}" for k, v in sorted(overrides.items())),
+            start=str(args.start),
+            end=str(args.end),
+            annual_sharpe=full.sharpe,
+            cagr=full.cagr,
+        )
+    )
+    returns = result.equity_curve.pct_change().dropna().to_numpy()
+    if len(returns) > 2 and returns.std() > 0:
+        print("\nhonesty check (multiple-testing correction)")
+        print(assess(returns, n_trials=n_trials).report())
 
     report_dir = Path(args.report_dir)
     report_dir.mkdir(parents=True, exist_ok=True)
