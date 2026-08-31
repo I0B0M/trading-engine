@@ -5,16 +5,20 @@ An event-driven backtesting engine for stock trading strategies. Replays
 trade through a broker model with slippage and commissions, and reports
 performance with a mandatory in-sample/out-of-sample split.
 
-Phase 1 of three:
+The design goal is not to find a winning strategy. It is to make it hard to
+fool yourself into thinking you have found one.
 
-1. **Backtesting engine** — test strategies on the past. ✅
-2. **Paper trading** — the same strategy classes run on live prices with fake
-   money via Alpaca's paper API. ✅
-2b. **Honest validation** — every backtest is logged and its Sharpe is judged
-   against the number of configurations ever tried. ✅
-3. **AI assistant** — describe a strategy in plain English; an LLM compiles
-   it to a validated config, the engine backtests it and reports. The AI
+1. **Backtesting engine** — test strategies against history. ✅
+2. **Honest validation** — every backtest is logged, and its Sharpe ratio is
+   judged against how many configurations have ever been tried. ✅
+3. **Paper trading** — the same strategy classes run on live market prices
+   with fake money via Alpaca's paper API. ✅
+4. **AI assistant** — describe a strategy in plain English; an LLM compiles it
+   to a validated config, the engine backtests it and reports. Planned. The AI
    suggests; it never trades.
+
+Everything here runs on simulated or paper money. No real-money trading, and
+nothing in this repo constitutes investment advice.
 
 ## Honest validation
 
