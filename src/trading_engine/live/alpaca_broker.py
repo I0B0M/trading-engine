@@ -5,7 +5,7 @@ in this project that can reach a live-money endpoint. Orders are notional
 market orders with DAY time-in-force; submitted after hours they queue for
 the next market open — the same fill timing the backtester assumes.
 
-Credentials come from the environment:
+Credentials come from a gitignored `.env` at the repo root, or the environment:
     ALPACA_API_KEY / ALPACA_SECRET_KEY  (or the APCA_API_KEY_ID /
     APCA_API_SECRET_KEY names Alpaca's own tooling uses)
 """
@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 
+from .env import load_env_file
 from .runner import PlannedOrder
 
 
@@ -22,6 +23,7 @@ class MissingCredentials(RuntimeError):
 
 
 def _env(*names: str) -> str | None:
+    load_env_file()
     for name in names:
         value = os.environ.get(name)
         if value:
@@ -37,8 +39,10 @@ class AlpacaPaperBroker:
             raise MissingCredentials(
                 "Alpaca paper keys not found. Create a free account at "
                 "https://alpaca.markets, generate PAPER API keys from the "
-                "dashboard, then:\n"
-                "  export ALPACA_API_KEY=...\n  export ALPACA_SECRET_KEY=..."
+                "dashboard, then copy .env.example to .env and fill in:\n"
+                "  ALPACA_API_KEY=...\n  ALPACA_SECRET_KEY=...\n"
+                ".env is gitignored, so the keys stay off the command line "
+                "and out of shell history."
             )
         from alpaca.trading.client import TradingClient
 

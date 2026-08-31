@@ -31,9 +31,20 @@ open, the same fill timing the backtester assumes.
 
 Safety: `paper=True` is hard-coded — no code path in this project can reach a
 live-money endpoint — and without `--execute` nothing is ever submitted.
-Credentials: free account at [alpaca.markets](https://alpaca.markets), paper
-API keys from the dashboard, then
-`export ALPACA_API_KEY=... ALPACA_SECRET_KEY=...`.
+
+### Credentials
+
+Free account at [alpaca.markets](https://alpaca.markets), generate **paper**
+API keys from the dashboard, then:
+
+```bash
+cp .env.example .env   # then edit .env and paste the two values
+```
+
+`.env` is gitignored, so keys stay off the command line, out of shell history,
+and out of git. Shell exports still work and take precedence if you prefer
+them. Never put live-money keys in this file — the client only ever talks to
+the paper endpoint, so live keys would simply fail.
 
 ## Design rules
 
