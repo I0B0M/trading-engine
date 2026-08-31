@@ -116,7 +116,7 @@ def _backtest(args: argparse.Namespace) -> int:
 
 
 def _live(args: argparse.Namespace) -> int:
-    from .live.alpaca_broker import AlpacaPaperBroker, MissingCredentials
+    from .live.alpaca_broker import AlpacaPaperBroker, AuthFailed, MissingCredentials
     from .live.runner import compute_desired_weights, live_data_window, reconcile
 
     symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
@@ -130,12 +130,11 @@ def _live(args: argparse.Namespace) -> int:
 
     try:
         broker = AlpacaPaperBroker()
-    except MissingCredentials as e:
+        equity, positions = broker.snapshot()
+    except (MissingCredentials, AuthFailed) as e:
         print(f"\n{e}")
         return 1
 
-    equity = broker.equity()
-    positions = broker.position_values()
     orders = reconcile(desired, equity, positions)
 
     print(f"\npaper account equity: ${equity:,.2f}")
@@ -203,16 +202,18 @@ def _keys() -> int:
 
 
 def _account() -> int:
-    from .live.alpaca_broker import AlpacaPaperBroker, MissingCredentials
+    from .live.alpaca_broker import AlpacaPaperBroker, AuthFailed, MissingCredentials
 
     try:
-        broker = AlpacaPaperBroker()
-    except MissingCredentials as e:
+        equity, positions = AlpacaPaperBroker().snapshot()
+    except (MissingCredentials, AuthFailed) as e:
         print(str(e))
         return 1
-    print(f"paper equity: ${broker.equity():,.2f}")
-    for symbol, value in sorted(broker.position_values().items()):
+    print(f"paper equity: ${equity:,.2f}")
+    for symbol, value in sorted(positions.items()):
         print(f"  {symbol:6} ${value:,.2f}")
+    if not positions:
+        print("  (no open positions)")
     return 0
 
 

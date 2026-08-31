@@ -22,6 +22,10 @@ class MissingCredentials(RuntimeError):
     pass
 
 
+class AuthFailed(RuntimeError):
+    pass
+
+
 def _env(*names: str) -> str | None:
     load_env_file()
     for name in names:
@@ -48,14 +52,43 @@ class AlpacaPaperBroker:
 
         self._client = TradingClient(key, secret, paper=True)  # never live
 
+    def snapshot(self) -> tuple[float, dict[str, float]]:
+        """Equity and position values in one call, with auth errors
+        translated into something a human can act on."""
+        from alpaca.common.exceptions import APIError
+
+        try:
+            equity = float(self._client.get_account().equity)
+            positions = {
+                p.symbol: float(p.market_value)
+                for p in self._client.get_all_positions()
+            }
+        except APIError as e:
+            if "unauthorized" in str(e).lower():
+                raise AuthFailed(
+                    "Alpaca rejected the credentials (unauthorized).\n\n"
+                    "Most common causes, in order:\n"
+                    "  1. The key ID and secret are from different generations. "
+                    "A new pair invalidates the old one, and both halves must "
+                    "come from the same 'Generate' click.\n"
+                    "  2. The secret was copied incompletely, or with extra "
+                    "text around it.\n"
+                    "  3. They are LIVE keys, not paper keys. Paper keys are "
+                    "generated on the Paper Trading page and the ID starts "
+                    "with 'PK'.\n\n"
+                    "Fix: generate a fresh PAPER pair at alpaca.markets, then "
+                    "run 'trade keys' and enter both values from that same "
+                    "screen."
+                ) from e
+            raise
+
+        return equity, positions
+
     def equity(self) -> float:
-        return float(self._client.get_account().equity)
+        return self.snapshot()[0]
 
     def position_values(self) -> dict[str, float]:
-        return {
-            p.symbol: float(p.market_value)
-            for p in self._client.get_all_positions()
-        }
+        return self.snapshot()[1]
 
     def submit(self, order: PlannedOrder) -> str:
         from alpaca.trading.enums import OrderSide, TimeInForce
