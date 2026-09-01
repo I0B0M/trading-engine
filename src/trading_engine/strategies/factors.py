@@ -91,7 +91,9 @@ def rank_zscores(values: dict[str, float]) -> dict[str, float]:
 
 
 def composite_scores(
-    closes_by_symbol: dict[str, np.ndarray], use_low_vol: bool = True
+    closes_by_symbol: dict[str, np.ndarray],
+    use_low_vol: bool = True,
+    extra_signals: dict[str, dict[str, float]] | None = None,
 ) -> dict[str, float]:
     """Equal-weighted composite of the available price-based factor signals.
 
@@ -100,11 +102,12 @@ def composite_scores(
     and in factor-combination tests equal weighting slightly beat
     inverse-volatility weighting.
 
-    NOTE: this composite is price-only. The two strongest documented factors
-    for large-cap universes -- quality (gross profits / assets) and value
-    (book-to-market) -- need point-in-time fundamental data we do not have,
-    so they are absent. Expect weaker results than the published four-factor
-    combinations for exactly that reason.
+    Price-based sleeves are computed here. Fundamental sleeves (quality,
+    value) are passed in via `extra_signals` as {name: {symbol: raw_value}},
+    because they require point-in-time accounting data that price history
+    cannot supply. A sleeve covering only part of the universe still ranks
+    only the names it covers -- see the coverage caveat in
+    data/fundamentals.py, which is a selection effect, not a rounding error.
     """
     mom6 = rank_zscores(
         {s: risk_adjusted_momentum(c, 6) for s, c in closes_by_symbol.items()}
@@ -132,6 +135,14 @@ def composite_scores(
         )
         if low_vol:
             sleeves.append(low_vol)
+
+    # Fundamental sleeves (quality, value) arrive pre-computed because they
+    # need point-in-time accounting data the price history does not carry.
+    # Each is rank-z-scored on the same footing as the price sleeves.
+    for raw in (extra_signals or {}).values():
+        sleeve = rank_zscores(raw)
+        if sleeve:
+            sleeves.append(sleeve)
 
     if not sleeves:
         return {}

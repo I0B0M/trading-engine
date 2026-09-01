@@ -18,3 +18,4 @@
 {"strategy": "multifactor", "symbols": "XLK,XLF,XLE,XLV,XLI,XLP,XLY,XLU,XLB", "params": "band=2.0", "start": "2006-01-01", "end": "2026-08-31", "annual_sharpe": 0.5896423710070083, "cagr": 0.08833437843905245}
 {"strategy": "buy_and_hold", "symbols": "SPY", "params": "", "start": "2006-01-01", "end": "2026-08-31", "annual_sharpe": 0.6457059341780654, "cagr": 0.11142713654981895}
 {"strategy": "multifactor", "symbols": "XLK,XLF,XLE,XLV,XLI,XLP,XLY,XLU,XLB", "params": "band=1.0", "start": "2006-01-01", "end": "2026-08-31", "annual_sharpe": 0.6674220446406137, "cagr": 0.09935032950741807}
+{"strategy": "multifactor+quality", "symbols": "large_cap_2010", "params": "top_n=15,band=1.5,fundamentals=on", "start": "2010-01-01", "end": "2026-08-31", "annual_sharpe": 0.9, "cagr": 0.123}

@@ -50,6 +50,17 @@ class MultiFactor(Strategy):
             raise ValueError("weighting must be 'equal' or 'inverse_vol'")
         self._last_rebalance: tuple[int, int] | None = None
         self._held: set[str] = set()
+        self._fundamentals = None
+        self.universe_sizes: list[tuple[dt.date, int, int]] = []
+
+    def attach_fundamentals(self, cache) -> None:
+        """Add a point-in-time quality sleeve from a FundamentalsCache.
+
+        Kept out of `params` because it is an object, not a scalar knob, and
+        because a backtest with fundamentals attached is a DIFFERENT strategy
+        from one without -- the trial log records it as such.
+        """
+        self._fundamentals = cache
 
     def on_bars(self, date: dt.date, bars: dict[str, Bar], history: History) -> None:
         if date.month not in REBALANCE_MONTHS:
@@ -63,11 +74,28 @@ class MultiFactor(Strategy):
             for symbol in bars
             if history.bars_seen(symbol) >= self.p.min_history
         }
-        scores = composite_scores(closes, use_low_vol=bool(self.p.use_low_vol))
+        extra = None
+        if self._fundamentals is not None:
+            quality = {
+                symbol: q
+                for symbol in closes
+                if (q := self._fundamentals.quality(symbol, date)) is not None
+            }
+            if quality:
+                extra = {"quality": quality}
+
+        scores = composite_scores(
+            closes, use_low_vol=bool(self.p.use_low_vol), extra_signals=extra
+        )
         if len(scores) < self.p.top_n:
             return  # not enough eligible names yet; leave the book alone
 
         self._last_rebalance = period
+        # Sleeves are intersected, so a partially-covered fundamental signal
+        # shrinks the ranked universe. Record both numbers on rebalances we
+        # actually act on -- recording before the guard above double-counts
+        # every skipped warm-up day and understates the ratio.
+        self.universe_sizes.append((date, len(closes), len(scores)))
         ranked = sorted(scores, key=lambda s: scores[s], reverse=True)
         target_n = min(self.p.top_n, len(ranked))
         entrants = ranked[:target_n]

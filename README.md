@@ -40,22 +40,52 @@ Both figures are reproduced exactly by `tests/test_validation.py`.
 
 ### What this found about our own strategies
 
-Measured, not assumed — sector ETFs, 2006–2026:
+Measured, not assumed. Individual stocks (67 US large caps from a 2010
+constituent list), 2010–2026, split into in-sample and out-of-sample:
 
-| Strategy | CAGR | Sharpe | max drawdown |
+| | CAGR | Sharpe | max drawdown |
 |---|---|---|---|
-| SPY buy-and-hold | **11.1%** | 0.65 | −55.2% |
-| multifactor (best of 9 configs) | 9.9% | 0.67 | −49.9% |
+| **momentum + low-vol + quality** | 12.3% | 0.90 | −26.4% |
+| &nbsp;&nbsp;in-sample (2010–2018) | 11.9% | **1.01** | **−14.5%** |
+| &nbsp;&nbsp;**out-of-sample (2019+)** | **12.8%** | **0.83** | −26.4% |
+| **SPY buy-and-hold** | **14.2%** | 0.86 | −33.7% |
+| &nbsp;&nbsp;in-sample (2010–2018) | 11.4% | 0.80 | −19.3% |
+| &nbsp;&nbsp;**out-of-sample (2019+)** | **17.5%** | **0.93** | −33.7% |
 
-After 11 logged configurations the luck hurdle is a Sharpe of **1.62**. Our best
-is **0.67**, so the verdict is *not distinguishable from luck* — and it earned
-less money than buying the index. That is the honest result, and the engine is
-built to surface it rather than hide it.
+Read the two bold rows together, because that is the whole lesson. **In-sample
+the strategy beat the index on every measure** — more return, better Sharpe,
+half the drawdown. **Out-of-sample it lost**, by 4.7 points of annual return
+and on Sharpe too. That is the textbook signature of a strategy fitted to its
+own test period, and it is exactly what this repo is built to expose rather
+than bury.
 
-Two known reasons it is weak, both real limitations rather than excuses: the
-universe is 9 sector ETFs, so there is almost no cross-sectional breadth to
-rank; and the composite is price-only, missing quality and value — the two
-best-documented factors for large caps.
+Adding point-in-time quality *did* help, consistent with the literature:
+10.7% → 12.3% CAGR and Sharpe 0.81 → 0.90 versus price factors alone. It just
+did not help enough to beat buying the index.
+
+And the honesty check, after 12 logged configurations:
+
+```
+  observed Sharpe (annual) :   0.90
+  configurations tried     : 12
+  luck hurdle (annual)     :   1.66
+  P(real edge > hurdle)    :   0.1%
+  VERDICT: NOT distinguishable from luck
+```
+
+**Three reasons to treat even these numbers as optimistic:**
+
+1. **Survivorship bias, measured at 17%.** The 2010 universe had 81 names;
+   14 have no usable price history today (13 genuine corporate deaths, plus
+   BK which still trades but fails to download). The backtest silently runs
+   without them, so it is biased upward by however badly they did. Run
+   `survivorship_report()` to see the list.
+2. **The quality signal ranks only 66% of the universe.** Sleeves are
+   intersected, and banks, utilities and energy filers report no
+   cost-of-goods line — so a third of the universe is excluded from every
+   ranking by accounting convention rather than by merit.
+3. **Only 67 names.** Real factor investing works across thousands of
+   securities; breadth is where statistical power comes from.
 
 ## Point-in-time fundamentals
 

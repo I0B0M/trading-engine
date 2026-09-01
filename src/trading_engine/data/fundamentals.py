@@ -258,17 +258,25 @@ class SecClient:
         return (payload or {}).get("facts", {}).get("us-gaap", {})
 
     def concept_facts(self, cik: str, field: str) -> list[Fact]:
-        """Facts for a logical field, trying each candidate tag in turn.
+        """Facts for a logical field, MERGED across every candidate tag.
 
-        Tag names vary by filer and era -- revenue tagging changed with ASC 606
-        in 2018 -- so the first tag that actually yields facts wins.
+        Merging rather than first-match is load-bearing. Revenue tagging
+        changed with ASC 606 in 2018: modern filers report
+        RevenueFromContractWithCustomerExcludingAssessedTax, which has no
+        pre-2018 history, while their older years sit under Revenues or
+        SalesRevenueNet. Taking the first tag that has any facts therefore
+        resolves to the modern tag and silently returns nothing for earlier
+        dates -- measured at 4% quality coverage in 2012 versus 70% in 2024
+        before this was fixed.
+
+        Duplicate periods across tags are left for point_in_time() to resolve
+        by filing date, which is the same rule it applies to restatements.
         """
         gaap = self.company_facts(cik)
+        merged: list[Fact] = []
         for tag in CONCEPTS[field]:
-            facts = parse_facts(gaap.get(tag, {}))
-            if facts:
-                return facts
-        return []
+            merged.extend(parse_facts(gaap.get(tag, {})))
+        return merged
 
     def snapshot(self, ticker: str, as_of: dt.date) -> dict[str, float | None]:
         """Every tracked fundamental for `ticker` as known on `as_of`."""
